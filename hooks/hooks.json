@@ -1,0 +1,42 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/delegate-session-start.js\"", "timeout": 5 }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/delegate-guard.js\"", "timeout": 5 }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/delegate-log.js\"", "timeout": 5 }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/delegate-approval.js\"", "timeout": 5 }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/delegate-log.js\"", "timeout": 5 },
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/delegate-reply-guard.js\"", "timeout": 5 }
+        ]
+      }
+    ]
+  }
+}

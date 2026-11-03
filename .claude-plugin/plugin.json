@@ -1,0 +1,8 @@
+{
+  "name": "delegate",
+  "version": "0.1.0",
+  "description": "Decides inline vs split when executing authorised work, picks a model tier per subagent, asks before a large fan-out, and guards every Agent call to carry a model. Also \"delegate report\" for subagent cost.",
+  "author": {
+    "name": "delegate maintainers"
+  }
+}
