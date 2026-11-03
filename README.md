@@ -17,7 +17,7 @@ Needs Node 18 or later. No npm dependencies.
 ## Install
 
 ```
-/plugin marketplace add <git URL or local path of this repository>
+/plugin marketplace add loclam812/delegate
 /plugin install delegate@delegate
 ```
 
