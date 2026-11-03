@@ -23,3 +23,9 @@ test('the off switch silences session start', () => {
   assert.strictEqual(r.status, 0);
   assert.strictEqual(r.stdout, '');
 });
+
+test('the trigger is injected on every way a session starts, resume included', () => {
+  const hooks = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'hooks.json'), 'utf8')).hooks;
+  const sources = hooks.SessionStart[0].matcher.split('|');
+  for (const source of ['startup', 'resume', 'clear', 'compact']) assert.ok(sources.includes(source), source);
+});
