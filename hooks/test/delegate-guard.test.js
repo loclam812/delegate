@@ -27,7 +27,7 @@ const ran = (dir, toolUseId, session = 's1') => {
 };
 const state = (dir, s = 's1') => JSON.parse(fs.readFileSync(path.join(dir, 'delegate', 'state', `${s}.json`), 'utf8'));
 // The prompt points at a delegate brief, which already carries the report contract.
-const withModel = { description: 'x', prompt: 'Read /runs/t/brief-1.md', subagent_type: 'general-purpose', model: 'haiku' };
+const withModel = { description: 'x', prompt: 'Read /runs/t/brief-1.md', subagent_type: 'general-purpose', model: 'haiku', effort: 'low' };
 
 test('a call with a model and the backstop off has no opinion', () => {
   const dir = setup({ guardMode: 'deny', backstop: false });
@@ -145,7 +145,7 @@ test('a spawn without a brief gets the report contract appended and auto-allowed
 
 test('the contract is not appended twice, nor to locators, read-only agents or forks', () => {
   const dir = setup({ guardMode: 'deny', backstop: false });
-  const base = { description: 'x', model: 'haiku' };
+  const base = { description: 'x', model: 'haiku', effort: 'low' };
   assert.strictEqual(call(dir, { ...base, prompt: 'p\n[report-contract] already', subagent_type: 'general-purpose' }), null);
   for (const t of ['Explore', 'caveman:cavecrew-investigator', 'Plan', 'planner', 'architect', 'fork']) {
     assert.strictEqual(call(dir, { ...base, prompt: 'p', subagent_type: t }), null, t);
@@ -172,4 +172,22 @@ test('approving several asks of one burst does not compound the allowance', () =
   for (const id of ['b4', 'b5', 'b6']) assert.strictEqual(call(dir, withModel, 's1', id).permissionDecision, 'ask');
   for (const id of ['b4', 'b5', 'b6']) ran(dir, id);
   assert.deepStrictEqual(state(dir), { spawned: 6, allowance: 8, pending: [] });
+});
+
+test('a locator on a model other than haiku is denied in deny mode and warned in warn mode', () => {
+  const locator = { description: 'find x', prompt: 'p', subagent_type: 'Explore', model: 'sonnet', effort: 'low' };
+  const denied = call(setup({ guardMode: 'deny', backstop: false }), locator);
+  assert.strictEqual(denied.permissionDecision, 'deny');
+  assert.match(denied.permissionDecisionReason, /locator .*haiku/);
+  const warned = call(setup({ guardMode: 'warn', backstop: false }), locator);
+  assert.strictEqual(warned.permissionDecision, undefined);
+  assert.match(warned.additionalContext, /locator .*haiku/);
+  assert.strictEqual(call(setup({ guardMode: 'deny', backstop: false }), { ...locator, model: 'haiku' }), null);
+});
+
+test('a call without effort gets a reminder but is never denied for it', () => {
+  const out = call(setup({ guardMode: 'deny', backstop: false }), { ...withModel, effort: undefined });
+  assert.strictEqual(out.permissionDecision, undefined);
+  assert.match(out.additionalContext, /no effort/);
+  assert.strictEqual(call(setup({ guardMode: 'deny', backstop: false }), { ...withModel, effort: 'medium' }), null);
 });

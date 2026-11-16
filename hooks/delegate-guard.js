@@ -36,12 +36,21 @@ function withReportContract(input, sessionId) {
   return { ...input, prompt: `${prompt}\n\n${contract}` };
 }
 
+const LOCATORS = new Set(['Explore', 'caveman:cavecrew-investigator']);
+
+// A missing model or a locator off haiku costs money on every call, so deny mode refuses them;
+// a missing effort only falls back to the agent's default, so it is a reminder.
 function checkModel(input, config) {
-  if (input.model || input.subagent_type === 'fork') return null;
-  if (config.guardMode === 'deny') {
-    return lib.preToolDecision('deny', `delegate guard: this Agent call has no model.\n${TIER_TABLE}`);
+  if (input.subagent_type === 'fork') return null;
+  const problems = [];
+  if (!input.model) problems.push('this Agent call has no model, so it inherits the session model');
+  else if (LOCATORS.has(input.subagent_type) && input.model !== 'haiku') problems.push(`a locator (${input.subagent_type}) runs on haiku, not ${input.model}`);
+  if (problems.length > 0 && config.guardMode === 'deny') {
+    return lib.preToolDecision('deny', `delegate guard: ${problems.join('; ')}.\n${TIER_TABLE}`);
   }
-  return lib.preToolContext(`delegate guard (warn): this Agent call has no model, so it inherits the session model.\n${TIER_TABLE}`);
+  if (!input.effort) problems.push('this Agent call has no effort');
+  if (problems.length === 0) return null;
+  return lib.preToolContext(`delegate guard (warn): ${problems.join('; ')}.\n${TIER_TABLE}`);
 }
 
 const MAX_PENDING = 20;
