@@ -123,7 +123,8 @@ Ask with AskUserQuestion:
   - `Run inline instead`;
   - `Cancel`.
 
-Only the approval hook grants the budget. Never write `~/.claude/delegate/state/` yourself.
+Only the hooks grant budget: the approval hook on this answer, the guard once a spawn the user
+allowed at its backstop prompt has run. Never write `~/.claude/delegate/state/` yourself.
 
 ## Step 6: dispatch contract
 

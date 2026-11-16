@@ -20,7 +20,8 @@
       {
         "matcher": "Agent|Task",
         "hooks": [
-          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/delegate-log.js\"", "timeout": 5 }
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/delegate-log.js\"", "timeout": 5 },
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/delegate-guard.js\"", "timeout": 5 }
         ]
       },
       {

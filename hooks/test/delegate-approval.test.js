@@ -100,3 +100,9 @@ test('after an approval of 8 with 2 spawned, the guard lets spawns 3-10 through 
   for (let i = 3; i <= 10; i += 1) assert.strictEqual(guard(), '', `spawn ${i}`);
   assert.match(guard(), /"ask"/);
 });
+
+test('an approval keeps the backstop asks still waiting to run', () => {
+  const dir = setup({ spawned: 2, allowance: 3, pending: ['t9'] });
+  send(dir, payload('Approve [delegate-approve:8]'));
+  assert.deepStrictEqual(state(dir), { spawned: 2, allowance: 10, pending: ['t9'] });
+});

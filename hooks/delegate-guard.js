@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // PreToolUse(Agent): every spawn names its model, and a session asks before it
-// spawns past its allowance. Spawns are reserved here, not counted on completion,
-// because parallel calls in one message all reach PreToolUse before any completes.
+// spawns past its allowance. Spawns within the allowance are reserved here, not counted on
+// completion, because parallel calls in one message all reach PreToolUse before any completes.
+// A spawn past it is counted by PostToolUse, the only sign that the user allowed it.
 // It also appends the report contract to a prompt that lacks one, so a reviewer's
 // full findings land in a file instead of in the parent's context.
 const path = require('path');
@@ -43,30 +44,57 @@ function checkModel(input, config) {
   return lib.preToolContext(`delegate guard (warn): this Agent call has no model, so it inherits the session model.\n${TIER_TABLE}`);
 }
 
-function backstop(sessionId, config) {
+const MAX_PENDING = 20;
+
+// An asked spawn is neither counted nor allowed more until it runs: PostToolUse fires only for an
+// approved call, so a declined one leaves the allowance where it was and its retry asks again.
+// Without a tool_use_id there is nothing to match the completion to, so the raise happens now.
+function backstop(sessionId, toolUseId, config) {
   return lib.withLock(lib.statePath(sessionId), () => {
     const state = lib.readState(sessionId, config);
-    const next = { spawned: state.spawned + 1, allowance: state.allowance };
-    let out = null;
-    if (next.spawned > state.allowance) {
-      // The hook never learns the user's answer, so the raise happens now.
-      const oldAllowance = state.allowance;
-      next.allowance = state.allowance + config.allowanceStep;
-      out = lib.preToolDecision('ask', `delegate backstop: this session has already spawned ${state.spawned} agents, its allowance is ${state.allowance}. Allow this one? Allowing raises the allowance by ${config.allowanceStep}.`);
-      out.hookSpecificOutput.additionalContext = `delegate backstop: this call needed the user's approval (spawn ${next.spawned}, allowance was ${oldAllowance}). If it ran, the user approved it; if it was blocked, they declined.`;
+    const spawned = state.spawned + 1;
+    if (spawned <= state.allowance) {
+      lib.writeState(sessionId, { ...state, spawned });
+      return null;
     }
+    const next = toolUseId
+      ? { ...state, pending: [...(state.pending || []), toolUseId].slice(-MAX_PENDING) }
+      : { ...state, spawned, allowance: state.allowance + config.allowanceStep };
     lib.writeState(sessionId, next);
+    const out = lib.preToolDecision('ask', `delegate backstop: this session has already spawned ${state.spawned} agents, its allowance is ${state.allowance}. Allow this one? Allowing raises the allowance by ${config.allowanceStep}.`);
+    out.hookSpecificOutput.additionalContext = `delegate backstop: this call needed the user's approval (spawn ${spawned}, allowance was ${state.allowance}). If it ran, the user approved it; if it was blocked, they declined.`;
     return out;
   });
 }
 
+function approved(sessionId, toolUseId, config) {
+  lib.withLock(lib.statePath(sessionId), () => {
+    const state = lib.readState(sessionId, config);
+    const pending = state.pending || [];
+    if (!pending.includes(toolUseId)) return;
+    const spawned = state.spawned + 1;
+    // Measured from the approved spawn, so several approvals from one parallel burst do not stack.
+    lib.writeState(sessionId, {
+      ...state,
+      spawned,
+      allowance: Math.max(state.allowance, spawned - 1 + config.allowanceStep),
+      pending: pending.filter((id) => id !== toolUseId),
+    });
+  });
+}
+
 lib.runHook('delegate-guard', (p) => {
+  if (p.hook_event_name === 'PostToolUse') {
+    const config = lib.readConfig();
+    if (config.backstop && p.session_id && p.tool_use_id) approved(p.session_id, p.tool_use_id, config);
+    return null;
+  }
   const input = p.tool_input;
   if (!input || typeof input !== 'object') return null;
   const config = lib.readConfig();
   const modelOut = checkModel(input, config);
   if (modelOut && modelOut.hookSpecificOutput.permissionDecision === 'deny') return modelOut;
-  const askOut = config.backstop && p.session_id ? backstop(p.session_id, config) : null;
+  const askOut = config.backstop && p.session_id ? backstop(p.session_id, p.tool_use_id, config) : null;
   const updatedInput = withReportContract(input, p.session_id);
   if (!askOut && !modelOut && !updatedInput) return null;
   const out = { ...(modelOut || {}).hookSpecificOutput, ...(askOut || {}).hookSpecificOutput, hookEventName: 'PreToolUse' };

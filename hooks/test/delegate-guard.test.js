@@ -13,10 +13,17 @@ function setup(config) {
   fs.writeFileSync(path.join(dir, 'delegate', 'config.json'), JSON.stringify(config));
   return dir;
 }
-const call = (dir, input, session = 's1') => {
-  const r = runNode(HOOK, JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'Agent', session_id: session, tool_input: input }), { CLAUDE_CONFIG_DIR: dir });
+let toolUseSeq = 0;
+const call = (dir, input, session = 's1', toolUseId = `t${(toolUseSeq += 1)}`) => {
+  const r = runNode(HOOK, JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'Agent', session_id: session, tool_use_id: toolUseId, tool_input: input }), { CLAUDE_CONFIG_DIR: dir });
   assert.strictEqual(r.status, 0);
   return r.stdout ? JSON.parse(r.stdout).hookSpecificOutput : null;
+};
+// PostToolUse fires only for a spawn that ran, so an asked spawn reaching it was approved.
+const ran = (dir, toolUseId, session = 's1') => {
+  const r = runNode(HOOK, JSON.stringify({ hook_event_name: 'PostToolUse', tool_name: 'Agent', session_id: session, tool_use_id: toolUseId, tool_input: withModel, tool_response: {} }), { CLAUDE_CONFIG_DIR: dir });
+  assert.strictEqual(r.status, 0);
+  assert.strictEqual(r.stdout, '');
 };
 const state = (dir, s = 's1') => JSON.parse(fs.readFileSync(path.join(dir, 'delegate', 'state', `${s}.json`), 'utf8'));
 // The prompt points at a delegate brief, which already carries the report contract.
@@ -47,16 +54,33 @@ test('deny mode refuses a call without a model and does not reserve a spawn', ()
   assert.strictEqual(fs.existsSync(path.join(dir, 'delegate', 'state', 's1.json')), false);
 });
 
-test('backstop asks on the 4th spawn, raises the allowance by 3, asks again on the 7th', () => {
+test('backstop asks on the 4th spawn; approving it raises the allowance by 3, so the 7th asks again', () => {
   const dir = setup({ guardMode: 'deny', backstop: true });
   for (let i = 1; i <= 3; i += 1) assert.strictEqual(call(dir, withModel), null, `spawn ${i}`);
-  const ask = call(dir, withModel);
+  const ask = call(dir, withModel, 's1', 'ask-4');
   assert.strictEqual(ask.permissionDecision, 'ask');
   assert.match(ask.additionalContext, /needed the user's approval \(spawn 4, allowance was 3\)/);
-  assert.deepStrictEqual(state(dir), { spawned: 4, allowance: 6 });
+  ran(dir, 'ask-4');
+  assert.deepStrictEqual(state(dir), { spawned: 4, allowance: 6, pending: [] });
   assert.strictEqual(call(dir, withModel), null);
   assert.strictEqual(call(dir, withModel), null);
   assert.strictEqual(call(dir, withModel).permissionDecision, 'ask');
+});
+
+test('a declined backstop ask raises nothing, so the retry asks again', () => {
+  const dir = setup({ guardMode: 'deny', backstop: true });
+  for (let i = 1; i <= 3; i += 1) call(dir, withModel);
+  assert.strictEqual(call(dir, withModel).permissionDecision, 'ask');
+  assert.strictEqual(state(dir).allowance, 3);
+  assert.strictEqual(call(dir, withModel).permissionDecision, 'ask');
+});
+
+test('a spawn that ran without an ask changes nothing on completion', () => {
+  const dir = setup({ guardMode: 'deny', backstop: true });
+  call(dir, withModel, 's1', 'plain');
+  const before = state(dir);
+  ran(dir, 'plain');
+  assert.deepStrictEqual(state(dir), before);
 });
 
 test('warn mode + missing model: an ask combines the tier table and the backstop line', () => {
@@ -76,11 +100,12 @@ test('a parallel burst of 4 calls produces exactly one ask', async () => {
     let out = '';
     child.stdout.on('data', (c) => { out += c; });
     child.on('close', () => resolve(out));
-    child.stdin.end(JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'Agent', session_id: 's1', tool_input: withModel }));
+    child.stdin.end(JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'Agent', session_id: 's1', tool_use_id: `p${Math.random()}`, tool_input: withModel }));
   });
   const outs = await Promise.all([one(), one(), one(), one()]);
   assert.strictEqual(outs.filter((o) => o.includes('"ask"')).length, 1);
-  assert.strictEqual(state(dir).spawned, 4);
+  assert.strictEqual(state(dir).spawned, 3);
+  assert.strictEqual(state(dir).pending.length, 1);
 });
 
 test('no session_id: no opinion and no state file', () => {
@@ -133,4 +158,18 @@ test('a backstop ask keeps ask and still carries the contract', () => {
   assert.strictEqual(out.permissionDecision, 'ask');
   assert.match(out.updatedInput.prompt, /\[report-contract\]/);
   assert.match(out.additionalContext, /needed the user's approval/);
+});
+
+test('hooks.json runs the guard after an Agent call too, so an approved ask is counted', () => {
+  const hooks = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'hooks.json'), 'utf8')).hooks;
+  const post = hooks.PostToolUse.find((entry) => entry.matcher === 'Agent|Task');
+  assert.ok(post.hooks.some((h) => h.command.includes('delegate-guard.js')));
+});
+
+test('approving several asks of one burst does not compound the allowance', () => {
+  const dir = setup({ guardMode: 'deny', backstop: true });
+  for (let i = 1; i <= 3; i += 1) call(dir, withModel);
+  for (const id of ['b4', 'b5', 'b6']) assert.strictEqual(call(dir, withModel, 's1', id).permissionDecision, 'ask');
+  for (const id of ['b4', 'b5', 'b6']) ran(dir, id);
+  assert.deepStrictEqual(state(dir), { spawned: 6, allowance: 8, pending: [] });
 });

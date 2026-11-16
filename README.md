@@ -7,7 +7,7 @@ role, and asks before a large fan-out. Hooks back it up:
 | Hook | Event | Does |
 |---|---|---|
 | `delegate-session-start.js` | SessionStart | tells the model to invoke the skill when execution starts |
-| `delegate-guard.js` | PreToolUse `Agent\|Task` | warns on (or denies) an Agent call without `model`; optional spawn backstop |
+| `delegate-guard.js` | PreToolUse, PostToolUse `Agent\|Task` | warns on (or denies) an Agent call without `model`; optional spawn backstop |
 | `delegate-log.js` | PostToolUse `Agent\|Task`, SubagentStop | logs each subagent's usage to `~/.claude/delegation-log.jsonl` |
 | `delegate-approval.js` | PostToolUse `AskUserQuestion` | grants the spawn budget when the user picks `Approve [delegate-approve:N]` |
 | `delegate-reply-guard.js` | SubagentStop | sends a reply over 15 lines / 2000 chars back once to move into a report file |
@@ -41,7 +41,8 @@ State lives in `~/.claude/delegate/` (or `$CLAUDE_CONFIG_DIR/delegate/`). Withou
 
 - `guardMode`: `warn` adds a reminder; `deny` blocks an Agent call without `model`.
 - `backstop`: once a session has spawned `initialAllowance` agents, each further spawn asks the
-  user; allowing one raises the allowance by `allowanceStep`.
+  user; allowing one raises the allowance by `allowanceStep`. Declining raises nothing, so a retry
+  asks again.
 
 Start with the default `warn` for a few days, then switch to `deny`.
 
