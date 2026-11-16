@@ -6,7 +6,7 @@ const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
 
-const DEFAULT_CONFIG = { guardMode: 'warn', backstop: false, initialAllowance: 3, allowanceStep: 3 };
+const DEFAULT_CONFIG = { guardMode: 'warn', backstop: false, initialAllowance: 3, allowanceStep: 3, gitGuard: true };
 
 const sanitize = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
 const configDir = () => process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');

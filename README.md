@@ -7,10 +7,11 @@ role, and asks before a large fan-out. Hooks back it up:
 | Hook | Event | Does |
 |---|---|---|
 | `delegate-session-start.js` | SessionStart | tells the model to invoke the skill when execution starts |
-| `delegate-guard.js` | PreToolUse `Agent\|Task` | warns on (or denies) an Agent call without `model`; optional spawn backstop |
+| `delegate-guard.js` | PreToolUse, PostToolUse `Agent\|Task` | warns on (or denies) an Agent call without `model`; optional spawn backstop |
+| `delegate-git-guard.js` | PreToolUse `Bash` | denies a subagent `git` add, commit, push, pull, reset, rebase, merge, cherry-pick, revert, restore, clean, checkout, switch, am, rm, mv, update-index, update-ref, symbolic-ref, bisect, and the writing forms of stash, tag, branch and worktree; git run through an alias or a script is not seen |
 | `delegate-log.js` | PostToolUse `Agent\|Task`, SubagentStop | logs each subagent's usage to `~/.claude/delegation-log.jsonl` |
 | `delegate-approval.js` | PostToolUse `AskUserQuestion` | grants the spawn budget when the user picks `Approve [delegate-approve:N]` |
-| `delegate-reply-guard.js` | SubagentStop | sends a reply over 15 lines / 2000 chars back once to move into a report file |
+| `delegate-reply-guard.js` | SubagentStop | sends a reply back once when it is over 15 lines / 2000 chars (move it into a report file) or when its brief asked for the `REVIEW verdict=` line and it has none |
 
 Needs Node 18 or later. No npm dependencies.
 
@@ -41,7 +42,10 @@ State lives in `~/.claude/delegate/` (or `$CLAUDE_CONFIG_DIR/delegate/`). Withou
 
 - `guardMode`: `warn` adds a reminder; `deny` blocks an Agent call without `model`.
 - `backstop`: once a session has spawned `initialAllowance` agents, each further spawn asks the
-  user; allowing one raises the allowance by `allowanceStep`.
+  user; allowing one raises the allowance by `allowanceStep`. Declining raises nothing, so a retry
+  asks again.
+- `gitGuard` (default `true`): a subagent's `git` writes are denied, so commits and discarded work
+  stay with the parent session; set it to `false` for subagents that should commit.
 
 Start with the default `warn` for a few days, then switch to `deny`.
 

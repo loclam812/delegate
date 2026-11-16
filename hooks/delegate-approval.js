@@ -31,7 +31,7 @@ lib.runHook('delegate-approval', (p) => {
   const config = lib.readConfig();
   lib.withLock(lib.statePath(p.session_id), () => {
     const state = lib.readState(p.session_id, config);
-    lib.writeState(p.session_id, { spawned: state.spawned, allowance: Math.max(state.allowance, state.spawned + budget) });
+    lib.writeState(p.session_id, { ...state, allowance: Math.max(state.allowance, state.spawned + budget) });
   });
   return null;
 });

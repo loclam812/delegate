@@ -24,7 +24,7 @@ test('paths follow CLAUDE_CONFIG_DIR', () => {
 test('readConfig falls back to defaults and merges a partial file', () => {
   const dir = mkTmpConfig();
   const lib = freshLib(dir);
-  assert.deepStrictEqual(lib.readConfig(), { guardMode: 'warn', backstop: false, initialAllowance: 3, allowanceStep: 3 });
+  assert.deepStrictEqual(lib.readConfig(), { guardMode: 'warn', backstop: false, initialAllowance: 3, allowanceStep: 3, gitGuard: true });
   fs.mkdirSync(path.join(dir, 'delegate'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'delegate', 'config.json'), '{"guardMode":"deny"}');
   assert.strictEqual(lib.readConfig().guardMode, 'deny');

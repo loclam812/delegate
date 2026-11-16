@@ -14,13 +14,20 @@
         "hooks": [
           { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/delegate-guard.js\"", "timeout": 5 }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/delegate-git-guard.js\"", "timeout": 5 }
+        ]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "Agent|Task",
         "hooks": [
-          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/delegate-log.js\"", "timeout": 5 }
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/delegate-log.js\"", "timeout": 5 },
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/delegate-guard.js\"", "timeout": 5 }
         ]
       },
       {
