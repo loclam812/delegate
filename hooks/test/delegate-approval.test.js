@@ -95,7 +95,7 @@ test('no session_id: nothing is written', () => {
 test('after an approval of 8 with 2 spawned, the guard lets spawns 3-10 through and asks on 11', () => {
   const dir = setup({ spawned: 2, allowance: 3 });
   send(dir, payload('Approve [delegate-approve:8]'));
-  const input = { description: 'x', prompt: 'Read /runs/t/brief-1.md', model: 'haiku' };
+  const input = { description: 'x', prompt: 'Read /runs/t/brief-1.md', model: 'haiku', effort: 'low' };
   const guard = () => runNode(GUARD, JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'Agent', session_id: 's1', tool_input: input }), { CLAUDE_CONFIG_DIR: dir }).stdout;
   for (let i = 3; i <= 10; i += 1) assert.strictEqual(guard(), '', `spawn ${i}`);
   assert.match(guard(), /"ask"/);

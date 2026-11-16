@@ -62,7 +62,8 @@ Use the Workflow tool only if the user has explicitly opted into workflows.
 
 ## Step 4: tiers
 
-Always pass `model` and `effort`. The guard hook denies an Agent call without `model`.
+Always pass `model` and `effort`. The guard hook warns on an Agent call without `model` or with a
+locator off haiku, and denies it when `guardMode` is `deny`; a missing `effort` gets a reminder.
 
 | Role | model | effort |
 |---|---|---|

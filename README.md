@@ -7,7 +7,8 @@ role, and asks before a large fan-out. Hooks back it up:
 | Hook | Event | Does |
 |---|---|---|
 | `delegate-session-start.js` | SessionStart | tells the model to invoke the skill when execution starts |
-| `delegate-guard.js` | PreToolUse, PostToolUse `Agent\|Task` | warns on (or denies) an Agent call without `model`; optional spawn backstop |
+| `delegate-guard.js` | PreToolUse, PostToolUse `Agent\|Task` | warns on (or denies) an Agent call without `model` or a locator off haiku, reminds on a missing `effort`; optional spawn backstop |
+| `delegate-state-guard.js` | PreToolUse `Write\|Edit\|MultiEdit\|Bash` | denies writes to `~/.claude/delegate/state/`, `config.json`, `off` or the whole directory (reads and copies out pass), so only the hooks and the user move the spawn allowance; `runs/` and `projects/` stay writable. Shell commands are checked by their text, so a path built in pieces (`cd ~/.claude && touch delegate/off`) is not seen |
 | `delegate-git-guard.js` | PreToolUse `Bash` | denies a subagent `git` add, commit, push, pull, reset, rebase, merge, cherry-pick, revert, restore, clean, checkout, switch, am, rm, mv, update-index, update-ref, symbolic-ref, bisect, and the writing forms of stash, tag, branch and worktree; git run through an alias or a script is not seen |
 | `delegate-log.js` | PostToolUse `Agent\|Task`, SubagentStop | logs each subagent's usage to `~/.claude/delegation-log.jsonl` |
 | `delegate-approval.js` | PostToolUse `AskUserQuestion` | grants the spawn budget when the user picks `Approve [delegate-approve:N]` |
@@ -34,13 +35,14 @@ or Claude asks before every brief and adapter it writes:
 
 State lives in `~/.claude/delegate/` (or `$CLAUDE_CONFIG_DIR/delegate/`). Without a
 `config.json` the guard only warns and the backstop is off. To tighten it, write
-`~/.claude/delegate/config.json`:
+`~/.claude/delegate/config.json` yourself (the state guard stops Claude from editing it):
 
 ```json
 { "guardMode": "deny", "backstop": true, "initialAllowance": 5, "allowanceStep": 3 }
 ```
 
-- `guardMode`: `warn` adds a reminder; `deny` blocks an Agent call without `model`.
+- `guardMode`: `warn` adds a reminder; `deny` blocks an Agent call without `model` or a locator
+  (Explore, cavecrew-investigator) on a model other than haiku. A missing `effort` is only a reminder.
 - `backstop`: once a session has spawned `initialAllowance` agents, each further spawn asks the
   user; allowing one raises the allowance by `allowanceStep`. Declining raises nothing, so a retry
   asks again.
