@@ -142,8 +142,8 @@ allowed at its backstop prompt has run. Never write `~/.claude/delegate/state/` 
   task `complete` in the ledger. After the last task, one final whole-branch review.
 - **Review:** follow the tier table. A review is an `Agent` with a brief like any other task.
   - Every review and re-review brief asks for this line in the reply:
-    `REVIEW verdict=<approve|fix|block> C=<n> H=<n> M=<n> L=<n>`. Nothing enforces it: a reply
-    without it shows up in `delegate report` as a missing REVIEW line.
+    `REVIEW verdict=<approve|fix|block> C=<n> H=<n> M=<n> L=<n>`. The reply guard sends a reply
+    without it back once; one that still lacks it shows up in `delegate report` as a missing REVIEW line.
   - After triaging a review, append to the ledger, counting by severity and leaving out zeros:
     `<task>: triage <agent type>:<model family> — fixed H1 M2, rejected M1, deferred L3`.
     Rejected means not a real defect; deferred means real but left for later. `delegate report`

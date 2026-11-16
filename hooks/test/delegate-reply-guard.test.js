@@ -43,3 +43,43 @@ test('a short reviewer reply passes with or without the REVIEW line', () => {
     assert.strictEqual(stop({ agent_type: 'code-reviewer', last_assistant_message: msg }).out, null, msg);
   }
 });
+
+const fs = require('fs');
+function transcriptWith(prompt) {
+  const dir = mkTmpConfig();
+  const file = path.join(dir, 'agent.jsonl');
+  fs.writeFileSync(file, `${JSON.stringify({ type: 'user', message: { role: 'user', content: prompt } })}\n`);
+  return { dir, file };
+}
+const REVIEW_ASK = 'Review the diff. Reply with this exact line: `REVIEW verdict=<approve|fix|block> C=<n> H=<n> M=<n> L=<n>`';
+
+test('a review asked for the REVIEW line is sent back once when its reply lacks it', () => {
+  const { file } = transcriptWith(REVIEW_ASK);
+  const { out } = stop({ agent_type: 'code-reviewer', agent_transcript_path: file, last_assistant_message: 'Status: done, 2 findings' });
+  assert.strictEqual(out.decision, 'block');
+  assert.match(out.reason, /REVIEW verdict=<approve\|fix\|block> C=<n> H=<n> M=<n> L=<n>/);
+});
+
+test('the ask can come from the brief file the prompt points at', () => {
+  const { dir, file } = transcriptWith('');
+  const brief = path.join(dir, 'brief-2.md');
+  fs.writeFileSync(brief, `# Brief\n\n${REVIEW_ASK}\n`);
+  fs.writeFileSync(file, `${JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: `Read ${brief} and do it.` }] } })}\n`);
+  assert.strictEqual(stop({ agent_type: 'general-purpose', agent_transcript_path: file, last_assistant_message: 'done' }).out.decision, 'block');
+});
+
+test('a reply with the REVIEW line, or an agent never asked for it, passes', () => {
+  const asked = transcriptWith(REVIEW_ASK).file;
+  assert.strictEqual(stop({ agent_type: 'code-reviewer', agent_transcript_path: asked, last_assistant_message: 'REVIEW verdict=approve C=0 H=0 M=0 L=1\nreport: /r.md' }).out, null);
+  const notAsked = transcriptWith('Review this file and list problems.').file;
+  assert.strictEqual(stop({ agent_type: 'code-reviewer', agent_transcript_path: notAsked, last_assistant_message: 'two problems' }).out, null);
+  assert.strictEqual(stop({ agent_type: 'code-reviewer', agent_transcript_path: asked, last_assistant_message: 'no line', stop_hook_active: true }).out, null);
+});
+
+test('a long review reply sent back for length is told to keep its REVIEW line', () => {
+  const { file } = transcriptWith(REVIEW_ASK);
+  const reply = `REVIEW verdict=fix C=0 H=1 M=0 L=0\n${longReply}`;
+  const { out } = stop({ agent_type: 'code-reviewer', agent_transcript_path: file, last_assistant_message: reply });
+  assert.strictEqual(out.decision, 'block');
+  assert.match(out.reason, /keep .*REVIEW verdict=/);
+});
