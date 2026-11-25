@@ -13,7 +13,10 @@ const PRICES = [
   ['claude-opus-5', { in: 5, out: 25, cache_read: 0.5, cache_write_5m: 6.25, cache_write_1h: 10 }],
   ['claude-opus-4', { in: 5, out: 25, cache_read: 0.5, cache_write_5m: 6.25, cache_write_1h: 10 }],
   ['claude-sonnet-4', { in: 3, out: 15, cache_read: 0.3, cache_write_5m: 3.75, cache_write_1h: 6 }],
+  ['claude-fable-5-2', { in: 8, out: 40, cache_read: 0.2, cache_write_5m: 10, cache_write_1h: 16 }],
   ['claude-fable-5-1', { in: 10, out: 50, cache_read: 0.25, cache_write_5m: 12.5, cache_write_1h: 20 }],
+  ['claude-fable-5', { in: 10, out: 50, cache_read: 0.25, cache_write_5m: 12.5, cache_write_1h: 20 }],
+  ['claude-sonnet-5-5', { in: 2, out: 10, cache_read: 0.1, cache_write_5m: 2.5, cache_write_1h: 4 }],
   ['claude-sonnet-5', { in: 2, out: 10, cache_read: 0.2, cache_write_5m: 2.5, cache_write_1h: 4 }],
   ['claude-haiku-4-5', { in: 1, out: 5, cache_read: 0.1, cache_write_5m: 1.25, cache_write_1h: 2 }],
   ['claude-haiku-5-5', { in: 0.1, out: 0.5, cache_read: 0.01, cache_write_5m: 0.125, cache_write_1h: 0.2 }],
@@ -21,9 +24,19 @@ const PRICES = [
 const DAY_MS = 86400000;
 const isFullId = (m) => typeof m === 'string' && m.startsWith('claude-');
 
+function priceRow(model) {
+  return PRICES.find(([prefix]) => (model || '').startsWith(prefix)) || null;
+}
+
 function priceFor(model) {
-  const hit = PRICES.find(([prefix]) => (model || '').startsWith(prefix));
+  const hit = priceRow(model);
   return hit ? hit[1] : null;
+}
+
+// A shorter row (claude-fable-5 for claude-fable-5-9) prices a new release at an older rate without saying so.
+function pricedByFallback(model) {
+  const hit = priceRow(model);
+  return Boolean(hit) && !/^(\[.*\]|-\d{8})?$/.test(model.slice(hit[0].length));
 }
 
 function costOf(rec) {
@@ -263,6 +276,8 @@ function buildReport(records, info) {
   out.push(`- Sessions past the initial allowance: ${info.backstopSessions}`);
   out.push(`- Fix rounds in run ledgers: ${info.fixRounds}`);
   out.push(`- Stale state files removed: ${info.removed}`);
+  const fallbackModels = [...new Set(recs.map((r) => r.model).filter((m) => m && pricedByFallback(m)))];
+  out.push(`- Priced by family fallback: ${fallbackModels.length ? fallbackModels.join(', ') : 'none'}`);
   out.push('', '## Suggestions');
   if (unroutedCost && total > 0 && unroutedCost[1].cost / total > 0.5) out.push('- Most spend is unrouted: check which skills spawn agents outside delegate.');
   if (nonInternal.length && parseErrors / nonInternal.length > 0.1) out.push('- Over 10% of transcripts failed to parse: the transcript format may have changed; refresh the fixture.');
