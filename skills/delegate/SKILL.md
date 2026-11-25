@@ -95,22 +95,22 @@ spawns at the implementer's role cost. Where `node "${CLAUDE_PLUGIN_ROOT}/hooks/
 median for that role and model family (for example `opus review`) with 5 or more runs, use that
 median instead. The per-model medians mix every role, so do not use them here.
 
-These defaults are medians from the author's `delegate report` on 2026-10-28; the haiku locator
+These defaults are medians from the author's `delegate report` on 2026-11-25; the haiku locator
 row had under 5 runs and keeps its original estimate. Your own medians replace them as above.
 
 | Role | Cost |
 |---|---|
-| sonnet implementer | USD 1.04 |
-| opus review | USD 1.53 |
-| sonnet re-review | USD 0.22 |
+| sonnet implementer | USD 1.76 |
+| opus review | USD 1.89 |
+| sonnet re-review | USD 0.19 |
 | haiku locator | USD 0.05 |
-| sonnet research | USD 1.13 |
+| sonnet research | USD 0.71 |
 
 **Small** means all of the following:
 - 3 spawns or fewer;
 - no worker on opus;
 - no new worktree or branch;
-- an estimate under USD 4.50.
+- an estimate under USD 6.00, which one sonnet implementer and its 2 headroom spawns fit under.
 
 For small, print one line and dispatch:
 `delegate: split into <N> agents (<role>:<model>, …), est $<x>, running.`
