@@ -29,6 +29,23 @@ test('priceFor covers the older 4.x model families', () => {
   assert.strictEqual(r.costOf({ model: 'claude-opus-5', tokens: tok({ out: 1e6 }) }), 25);
 });
 
+test('priceFor prices Fable 5.2 and Sonnet 5.5 cache reads at their own rates', () => {
+  const r = load(mkTmpConfig());
+  assert.strictEqual(r.costOf({ model: 'claude-fable-5-2', tokens: tok({ in: 1e6, out: 1e6, cache_read: 1e6 }) }), 48.2);
+  assert.strictEqual(r.costOf({ model: 'claude-fable-5-1', tokens: tok({ out: 1e6 }) }), 50);
+  assert.strictEqual(r.costOf({ model: 'claude-sonnet-5-5', tokens: tok({ cache_read: 1e6 }) }), 0.1);
+  assert.strictEqual(r.costOf({ model: 'claude-sonnet-5', tokens: tok({ cache_read: 1e6 }) }), 0.2);
+});
+
+test('report names models priced by a family fallback row', () => {
+  const r = load(mkTmpConfig());
+  const info = { days: 30, backstopSessions: 0, fixRounds: 0, removed: 0 };
+  const rec = (model) => ({ agent_id: model, origin: 'unrouted', project: 'p', model, tokens: tok({ out: 5 }) });
+  const text = r.buildReport([rec('claude-fable-5-9'), rec('claude-opus-5-5[1m]'), rec('claude-sonnet-5-5')], info);
+  assert.match(text, /- Priced by family fallback: claude-fable-5-9\n/);
+  assert.match(r.buildReport([rec('claude-opus-5-5')], info), /- Priced by family fallback: none/);
+});
+
 test('mergeByAgent: transcript metrics win over post_tool metrics, post_tool line first', () => {
   const r = load(mkTmpConfig());
   const merged = r.mergeByAgent([
